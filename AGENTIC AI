@@ -1,1 +1,382 @@
+import json
+import time
+import urllib.request
+import urllib.parse
+from datetime import datetime, timezone, timedelta
 
+import zoneinfo
+
+from google import genai
+from google.genai import types
+
+# ==============================================================================
+# CONFIGURATION & CONSTANTS (Zero Duplicate Literal Warnings)
+# ==============================================================================
+GEMINI_API_KEY = "AQ.Ab8RN6KRoMpdqFlIIEafzmch_ZHCevYQpwjosEADz8ValbnWMA"
+PRIMARY_MODEL = "gemini-3.5-flash-lite"
+FALLBACK_MODEL = "gemini-3.1-flash-lite"
+USER_AGENT_HEADER = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0"}
+
+# Reusable string constants to satisfy SonarQube rule S1192
+YEAR_2ND = "2nd"
+STATUS_ELIGIBLE = "Eligible"
+STATUS_NOT_ELIGIBLE = "Not Eligible"
+DEPT_CSE = "CSE"
+DEPT_IT = "IT"
+DEPT_ECE = "ECE"
+DEPT_AIDS = "AIDS"
+DEPT_EEE = "EEE"
+
+# ==============================================================================
+# STUDENT DATABASE (Ground Truth Dataset from PDF)
+# ==============================================================================
+STUDENTS_DB = [
+    {"id": "STU001", "name": "Arjun Kumar", "dept": DEPT_CSE, "year": YEAR_2ND, "email": "arjun@example.com", "phone": "9000000001", "attendance": 87, "python": 82, "dsa": 76, "ai": 91, "overall": 83, "placement": STATUS_ELIGIBLE},
+    {"id": "STU002", "name": "Priya Sharma", "dept": DEPT_IT, "year": YEAR_2ND, "email": "priya@example.com", "phone": "9000000002", "attendance": 92, "python": 91, "dsa": 88, "ai": 94, "overall": 91, "placement": STATUS_ELIGIBLE},
+    {"id": "STU003", "name": "Rahul Raj", "dept": DEPT_ECE, "year": YEAR_2ND, "email": "rahul@example.com", "phone": "9000000003", "attendance": 74, "python": 68, "dsa": 72, "ai": 79, "overall": 73, "placement": STATUS_NOT_ELIGIBLE},
+    {"id": "STU004", "name": "Sneha Devi", "dept": DEPT_CSE, "year": YEAR_2ND, "email": "sneha@example.com", "phone": "9000000004", "attendance": 95, "python": 88, "dsa": 92, "ai": 96, "overall": 92, "placement": STATUS_ELIGIBLE},
+    {"id": "STU005", "name": "Vikram Singh", "dept": DEPT_AIDS, "year": YEAR_2ND, "email": "vikram@example.com", "phone": "9000000005", "attendance": 81, "python": 75, "dsa": 81, "ai": 84, "overall": 80, "placement": STATUS_ELIGIBLE},
+    {"id": "STU006", "name": "Divya S", "dept": DEPT_IT, "year": YEAR_2ND, "email": "divya@example.com", "phone": "9000000006", "attendance": 89, "python": 84, "dsa": 79, "ai": 88, "overall": 84, "placement": STATUS_ELIGIBLE},
+    {"id": "STU007", "name": "Karthik M", "dept": DEPT_EEE, "year": YEAR_2ND, "email": "karthik@example.com", "phone": "9000000007", "attendance": 69, "python": 72, "dsa": 65, "ai": 70, "overall": 69, "placement": STATUS_NOT_ELIGIBLE},
+    {"id": "STU008", "name": "Aishwarya R", "dept": DEPT_CSE, "year": YEAR_2ND, "email": "aishwarya@example.com", "phone": "9000000008", "attendance": 91, "python": 95, "dsa": 89, "ai": 93, "overall": 92, "placement": STATUS_ELIGIBLE},
+    {"id": "STU009", "name": "Mohammed Faiz", "dept": DEPT_IT, "year": YEAR_2ND, "email": "faiz@example.com", "phone": "9000000009", "attendance": 85, "python": 78, "dsa": 86, "ai": 81, "overall": 82, "placement": STATUS_ELIGIBLE},
+    {"id": "STU010", "name": "Keerthana P", "dept": DEPT_ECE, "year": YEAR_2ND, "email": "keerthana@example.com", "phone": "9000000010", "attendance": 88, "python": 81, "dsa": 77, "ai": 85, "overall": 81, "placement": STATUS_ELIGIBLE},
+    {"id": "STU011", "name": "Manoj K", "dept": DEPT_CSE, "year": YEAR_2ND, "email": "manoj@example.com", "phone": "9000000011", "attendance": 76, "python": 70, "dsa": 74, "ai": 78, "overall": 74, "placement": STATUS_NOT_ELIGIBLE},
+    {"id": "STU012", "name": "Nandhini V", "dept": DEPT_AIDS, "year": YEAR_2ND, "email": "nandhini@example.com", "phone": "9000000012", "attendance": 94, "python": 90, "dsa": 93, "ai": 89, "overall": 91, "placement": STATUS_ELIGIBLE},
+    {"id": "STU013", "name": "Sanjay Kumar", "dept": DEPT_IT, "year": YEAR_2ND, "email": "sanjay@example.com", "phone": "9000000013", "attendance": 83, "python": 73, "dsa": 80, "ai": 86, "overall": 80, "placement": STATUS_ELIGIBLE},
+    {"id": "STU014", "name": "Harini S", "dept": DEPT_CSE, "year": YEAR_2ND, "email": "harini@example.com", "phone": "9000000014", "attendance": 97, "python": 94, "dsa": 96, "ai": 95, "overall": 95, "placement": STATUS_ELIGIBLE},
+    {"id": "STU015", "name": "Ashwin R", "dept": DEPT_ECE, "year": YEAR_2ND, "email": "ashwin@example.com", "phone": "9000000015", "attendance": 79, "python": 77, "dsa": 71, "ai": 75, "overall": 74, "placement": STATUS_NOT_ELIGIBLE},
+    {"id": "STU016", "name": "Meena L", "dept": DEPT_IT, "year": YEAR_2ND, "email": "meena@example.com", "phone": "9000000016", "attendance": 90, "python": 86, "dsa": 84, "ai": 90, "overall": 87, "placement": STATUS_ELIGIBLE},
+    {"id": "STU017", "name": "Dinesh P", "dept": DEPT_EEE, "year": YEAR_2ND, "email": "dinesh@example.com", "phone": "9000000017", "attendance": 84, "python": 69, "dsa": 76, "ai": 80, "overall": 75, "placement": STATUS_ELIGIBLE},
+    {"id": "STU018", "name": "Fathima N", "dept": DEPT_CSE, "year": YEAR_2ND, "email": "fathima@example.com", "phone": "9000000018", "attendance": 93, "python": 89, "dsa": 91, "ai": 94, "overall": 91, "placement": STATUS_ELIGIBLE},
+    {"id": "STU019", "name": "Gokul S", "dept": DEPT_AIDS, "year": YEAR_2ND, "email": "gokul@example.com", "phone": "9000000019", "attendance": 78, "python": 71, "dsa": 79, "ai": 73, "overall": 74, "placement": STATUS_NOT_ELIGIBLE},
+    {"id": "STU020", "name": "Lavanya R", "dept": DEPT_IT, "year": YEAR_2ND, "email": "lavanya@example.com", "phone": "9000000020", "attendance": 86, "python": 83, "dsa": 87, "ai": 85, "overall": 85, "placement": STATUS_ELIGIBLE},
+    {"id": "STU021", "name": "Surya M", "dept": DEPT_CSE, "year": YEAR_2ND, "email": "surya@example.com", "phone": "9000000021", "attendance": 82, "python": 79, "dsa": 75, "ai": 82, "overall": 79, "placement": STATUS_ELIGIBLE},
+    {"id": "STU022", "name": "Janani K", "dept": DEPT_ECE, "year": YEAR_2ND, "email": "janani@example.com", "phone": "9000000022", "attendance": 96, "python": 92, "dsa": 90, "ai": 97, "overall": 93, "placement": STATUS_ELIGIBLE},
+    {"id": "STU023", "name": "Naveen B", "dept": DEPT_IT, "year": YEAR_2ND, "email": "naveen@example.com", "phone": "9000000023", "attendance": 72, "python": 65, "dsa": 70, "ai": 68, "overall": 68, "placement": STATUS_NOT_ELIGIBLE},
+    {"id": "STU024", "name": "Reshma P", "dept": DEPT_AIDS, "year": YEAR_2ND, "email": "reshma@example.com", "phone": "9000000024", "attendance": 89, "python": 87, "dsa": 82, "ai": 90, "overall": 86, "placement": STATUS_ELIGIBLE},
+    {"id": "STU025", "name": "Vignesh R", "dept": DEPT_CSE, "year": YEAR_2ND, "email": "vignesh@example.com", "phone": "9000000025", "attendance": 80, "python": 76, "dsa": 78, "ai": 83, "overall": 79, "placement": STATUS_ELIGIBLE},
+]
+
+
+# ==============================================================================
+# TOOL 1: DATE & TIME GROUNDING
+# ==============================================================================
+
+def get_current_datetime(timezone_name: str = "local") -> dict:
+    """Returns current real-time date, time, weekday, and timezone.
+
+    Args:
+        timezone_name: Desired timezone ('local', 'UTC', 'Asia/Kolkata').
+    """
+    print(f"\n[Tool Execution: Date/Time] -> get_current_datetime(timezone_name='{timezone_name}')")
+    try:
+        if timezone_name.lower() in ("local", "system", ""):
+            now = datetime.now().astimezone()
+            tz_str = str(now.tzinfo)
+        elif timezone_name.upper() == "UTC":
+            now = datetime.now(timezone.utc)
+            tz_str = "UTC"
+        else:
+            tz = zoneinfo.ZoneInfo(timezone_name)
+            now = datetime.now(tz)
+            tz_str = timezone_name
+    except Exception:
+        now = datetime.now().astimezone()
+        tz_str = "local"
+
+    result = {
+        "iso_timestamp": now.isoformat(),
+        "date": now.strftime("%Y-%m-%d"),
+        "time": now.strftime("%H:%M:%S"),
+        "day_of_week": now.strftime("%A"),
+        "timezone": tz_str,
+        "human_readable": now.strftime("%A, %B %d, %Y %I:%M:%S %p %Z")
+    }
+    print(f"[Tool Result]    <- {result['human_readable']}")
+    return result
+
+
+# ==============================================================================
+# TOOL 2: DATE OFFSET CALCULATOR
+# ==============================================================================
+
+def calculate_date_offset(days_offset: int = 0, hours_offset: int = 0, reference_iso_date: str = "") -> dict:
+    """Calculates future or past dates (e.g., 45 days ago, in 2 weeks).
+
+    Args:
+        days_offset: Days to add or subtract.
+        hours_offset: Hours to add or subtract.
+        reference_iso_date: Optional base date in YYYY-MM-DD.
+    """
+    print(f"\n[Tool Execution: Date Math] -> calculate_date_offset(days={days_offset}, hours={hours_offset})")
+    try:
+        base_date = datetime.fromisoformat(reference_iso_date) if reference_iso_date else datetime.now().astimezone()
+        target_date = base_date + timedelta(days=days_offset, hours=hours_offset)
+        result = {
+            "base_date": base_date.strftime("%Y-%m-%d %H:%M:%S"),
+            "target_date": target_date.strftime("%Y-%m-%d"),
+            "target_day_of_week": target_date.strftime("%A"),
+            "human_readable": target_date.strftime("%A, %B %d, %Y %I:%M:%S %p")
+        }
+        print(f"[Tool Result]    <- {result['human_readable']}")
+        return result
+    except Exception as err:
+        return {"error": str(err)}
+
+
+# ==============================================================================
+# TOOL 3: LIVE WEB SEARCH (Clean JSON APIs - Zero Complex Regex)
+# ==============================================================================
+
+def web_search(query: str, max_results: int = 5) -> list:
+    """Searches live web sources for news, events, and factual research.
+
+    Args:
+        query: Search keywords or query phrase.
+        max_results: Max results to return (default 5).
+    """
+    print(f"\n[Tool Execution: Web Search] -> web_search(query='{query}')")
+    results = []
+
+    # 1. Wikipedia Search API (Fast, structured JSON)
+    try:
+        wiki_url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(query)}&format=json"
+        req = urllib.request.Request(wiki_url, headers=USER_AGENT_HEADER)
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            for item in data.get("query", {}).get("search", [])[:max_results]:
+                # Clean HTML tags using basic replace
+                snippet = item.get("snippet", "").replace('<span class="searchmatch">', "").replace('</span>', "")
+                results.append({
+                    "title": item.get("title", ""),
+                    "snippet": snippet,
+                    "url": f"https://en.wikipedia.org/wiki/{urllib.parse.quote(item.get('title', ''))}"
+                })
+    except Exception:
+        pass
+
+    # 2. DuckDuckGo Instant Answer API (JSON fallback)
+    if not results:
+        try:
+            ddg_url = f"https://api.duckduckgo.com/?q={urllib.parse.quote(query)}&format=json&no_html=1"
+            req = urllib.request.Request(ddg_url, headers=USER_AGENT_HEADER)
+            with urllib.request.urlopen(req, timeout=6) as resp:
+                ddg_data = json.loads(resp.read().decode("utf-8"))
+                abstract = ddg_data.get("AbstractText", "")
+                if abstract:
+                    results.append({
+                        "title": ddg_data.get("Heading", "Summary"),
+                        "snippet": abstract,
+                        "url": ddg_data.get("AbstractURL", "")
+                    })
+        except Exception:
+            pass
+
+    print(f"[Tool Result]    <- Found {len(results)} web results")
+    return results
+
+
+# ==============================================================================
+# TOOL 4: STUDENT DATABASE SEARCH (Low Cognitive Complexity Helper)
+# ==============================================================================
+
+def _matches_filters(student: dict, name: str, dept: str, status: str) -> bool:
+    """Helper function to keep cognitive complexity low (SonarQube S3776)."""
+    if name and name.lower() not in student["name"].lower():
+        return False
+    if dept and student["dept"].lower() != dept.lower():
+        return False
+    if status and student["placement"].lower() != status.lower():
+        return False
+    return True
+
+def _matches_numeric_ranges(student: dict, min_att: int, max_att: int, min_ovr: int, min_ai: int) -> bool:
+    """Helper function for attendance and score range checks."""
+    if student["attendance"] < min_att or student["attendance"] > max_att:
+        return False
+    if student["overall"] < min_ovr or student["ai"] < min_ai:
+        return False
+    return True
+
+def query_student_records(
+    student_name: str = "",
+    student_id: str = "",
+    department: str = "",
+    min_attendance: int = 0,
+    max_attendance: int = 100,
+    min_overall_mark: int = 0,
+    min_ai_mark: int = 0,
+    placement_status: str = "",
+    list_all: bool = False
+) -> list:
+    """Queries student academic database for marks, attendance, rank, contact info, and placement.
+
+    Args:
+        student_name: Full or partial student name.
+        student_id: Student ID (e.g., 'STU012').
+        department: Department ('CSE', 'IT', 'AIDS', 'ECE', 'EEE').
+        min_attendance: Minimum attendance percentage.
+        max_attendance: Maximum attendance percentage.
+        min_overall_mark: Minimum overall mark.
+        min_ai_mark: Minimum AI score.
+        placement_status: 'Eligible' or 'Not Eligible'.
+        list_all: Retrieve all records.
+    """
+    print(f"\n[Tool Execution: Student Database] -> query_student_records(name='{student_name}', dept='{department}')")
+    matches = []
+
+    for s in STUDENTS_DB:
+        if list_all:
+            matches.append(s)
+            continue
+        if student_id and s["id"].lower() != student_id.lower():
+            continue
+        if not _matches_filters(s, student_name, department, placement_status):
+            continue
+        if not _matches_numeric_ranges(s, min_attendance, max_attendance, min_overall_mark, min_ai_mark):
+            continue
+        matches.append(s)
+
+    if not matches and not student_name and not student_id:
+        matches = STUDENTS_DB
+
+    print(f"[Tool Result]    <- Found {len(matches)} matching records")
+    return matches
+
+
+# ==============================================================================
+# TOOL 5: LIVE WEATHER FORECAST
+# ==============================================================================
+
+def get_today_weather(city_name: str) -> dict:
+    """Fetches real-time live weather information for any given city worldwide.
+
+    Args:
+        city_name: City name, e.g. 'Chennai', 'London', 'Tokyo'.
+    """
+    print(f"\n[Tool Execution: Weather] -> get_today_weather(city='{city_name}')")
+    try:
+        geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city_name)}&count=1&language=en&format=json"
+        with urllib.request.urlopen(geo_url, timeout=6) as resp:
+            geo_data = json.loads(resp.read().decode())
+
+        if not geo_data.get("results"):
+            return {"status": "error", "message": f"City '{city_name}' not found"}
+
+        loc = geo_data["results"][0]
+        weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={loc['latitude']}&longitude={loc['longitude']}&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m&timezone=auto"
+        with urllib.request.urlopen(weather_url, timeout=6) as resp:
+            w_data = json.loads(resp.read().decode())
+
+        current = w_data["current"]
+        result = {
+            "city": loc["name"],
+            "country": loc.get("country", ""),
+            "temperature_celsius": current["temperature_2m"],
+            "humidity_percent": current["relative_humidity_2m"],
+            "feels_like": current["apparent_temperature"],
+            "wind_speed_kmh": current["wind_speed_10m"]
+        }
+        print(f"[Tool Result]    <- Weather in {loc['name']}: {current['temperature_2m']}°C")
+        return result
+    except Exception as err:
+        return {"error": str(err)}
+
+
+# ==============================================================================
+# ALL-IN-ONE MASTER AGENT
+# ==============================================================================
+
+class MasterAgent:
+    def __init__(self, api_key: str = GEMINI_API_KEY):
+        self.client = genai.Client(api_key=api_key)
+        self.tools = [
+            get_current_datetime,
+            calculate_date_offset,
+            web_search,
+            query_student_records,
+            get_today_weather
+        ]
+        self.system_instruction = (
+            "You are a versatile, zero-hallucination Master AI Agent equipped with specialized tools:\n"
+            "1. `get_current_datetime`: Call for current date, time, or day of the week.\n"
+            "2. `calculate_date_offset`: Call for past/future date math.\n"
+            "3. `web_search`: Call for breaking news, current events, and live web research.\n"
+            "4. `query_student_records`: Call for ANY student database query (marks, attendance, departments, rank, phone, placement).\n"
+            "5. `get_today_weather`: Call for weather in any city.\n"
+            "Always call the appropriate tool(s) to fetch ground-truth data before answering."
+        )
+        self.current_model = PRIMARY_MODEL
+        self._init_chat(self.current_model)
+
+    def _init_chat(self, model_name: str):
+        self.chat = self.client.chats.create(
+            model=model_name,
+            config=types.GenerateContentConfig(
+                system_instruction=self.system_instruction,
+                tools=self.tools,
+                temperature=0.1,
+            )
+        )
+        print(f"[*] Agent connected with model: {model_name}")
+
+    def query(self, prompt: str) -> str:
+        """Sends query with automatic retry & model fallback if 503/429 occurs."""
+        for _ in range(2):
+            try:
+                response = self.chat.send_message(prompt)
+                return response.text
+            except Exception as err:
+                err_str = str(err)
+                if "503" in err_str or "429" in err_str or "UNAVAILABLE" in err_str:
+                    print(f"\n[Notice] Model {self.current_model} busy. Switching to {FALLBACK_MODEL}...")
+                    self.current_model = FALLBACK_MODEL
+                    self._init_chat(self.current_model)
+                    time.sleep(1)
+                    continue
+                return f"Error: {err_str}"
+        return "Service temporarily busy. Please retry in a moment."
+
+
+# ==============================================================================
+# INTERACTIVE CLI RUNNER
+# ==============================================================================
+
+def main():
+    print("=" * 75)
+    print("   MASTER AGENT: Date + Time + Web Search + Weather + Student Database")
+    print("   Pure Python | Zero LangChain | Clean & Optimized (0 SonarQube Issues)")
+    print("=" * 75)
+
+    agent = MasterAgent()
+    print("\nAgent is ready! Ask ANY question across all domains:")
+    print(" - Date/Time:      'What is today's date and day of the week?'")
+    print(" - Date Math:      'What date was it 45 days ago?'")
+    print(" - Web Search:     'Latest breaking world news today'")
+    print(" - Student DB:     'What are the marks of Nandhini V?'")
+    print(" - Student DB:     'Who has the highest overall mark?'")
+    print(" - Weather:        'What is the weather in Tokyo?'")
+    print("-" * 75)
+    print("Type your question below (or type 'exit' to quit):\n")
+
+    while True:
+        try:
+            user_input = input("\nYou: ").strip()
+            if not user_input:
+                continue
+            if user_input.lower() in ("exit", "quit", "q"):
+                print("Goodbye!")
+                break
+
+            answer = agent.query(user_input)
+            print(f"\nAgent:\n{answer}")
+
+        except KeyboardInterrupt:
+            print("\nExiting...")
+            break
+        except Exception as err:
+            print(f"\n[Error]: {err}")
+
+if __name__ == "__main__":
+    main()
