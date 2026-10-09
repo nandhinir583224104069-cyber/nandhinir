@@ -1,0 +1,689 @@
+All-in-One E-Commerce Shopping & Comfort Recommendation App
+Zero external dependencies - Run with: python app.py
+"""
+
+import sys
+import os
+import json
+import webbrowser
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+import threading
+import time
+
+# Ensure UTF-8 output on Windows
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
+PORT = 5050
+
+# Comprehensive Online Shopping Catalog with Comfort & Performance Metrics
+PRODUCTS = [
+    # --- LAPTOPS ---
+    {
+        "id": "LP-01",
+        "name": "ASUS Vivobook 15 (Core i5 12th Gen)",
+        "category": "Laptops",
+        "price": 49990,
+        "comfort_rating": 8.8,
+        "comfort_highlights": "ErgoSense ergonomic backlit keyboard, anti-glare display reducing eye strain, 180° lay-flat hinge.",
+        "specs": "16 GB RAM • 512 GB SSD • Intel i5-1235U (10 Cores) • 15.6\" FHD",
+        "rating": 4.5,
+        "badge": "Top Performer",
+        "image_icon": "💻",
+        "tags": ["laptop", "asus", "programming", "intel", "college", "fast"]
+    },
+    {
+        "id": "LP-02",
+        "name": "Acer Aspire Lite (Core 3 100U)",
+        "category": "Laptops",
+        "price": 47490,
+        "comfort_rating": 8.5,
+        "comfort_highlights": "Slim 1.59kg lightweight body, narrow bezel eye-care screen, silent fan cooling.",
+        "specs": "16 GB RAM • 512 GB SSD • Intel Core 3 100U • Expandable RAM",
+        "rating": 4.4,
+        "badge": "Balanced Choice",
+        "image_icon": "💻",
+        "tags": ["laptop", "acer", "study", "portable", "lightweight"]
+    },
+    {
+        "id": "LP-03",
+        "name": "Lenovo IdeaPad Slim 3 (Ryzen 5 7520U)",
+        "category": "Laptops",
+        "price": 44990,
+        "comfort_rating": 9.1,
+        "comfort_highlights": "TUV Rheinland Low Blue Light certified display, comfortable curved keycaps, 8hr battery.",
+        "specs": "16 GB RAM • 512 GB SSD • AMD Ryzen 5 • Rapid Charge (80% in 1hr)",
+        "rating": 4.6,
+        "badge": "Eye Comfort",
+        "image_icon": "💻",
+        "tags": ["laptop", "lenovo", "ryzen", "battery", "comfort", "blue light"]
+    },
+    {
+        "id": "LP-04",
+        "name": "HP 15s (AMD Ryzen 3 5300U)",
+        "category": "Laptops",
+        "price": 38990,
+        "comfort_rating": 7.9,
+        "comfort_highlights": "Full-size numeric keypad, micro-edge anti-glare screen, fast boot.",
+        "specs": "8 GB RAM • 512 GB SSD • AMD Ryzen 3 • Upgradeable RAM",
+        "rating": 4.2,
+        "badge": "Budget Friendly",
+        "image_icon": "💻",
+        "tags": ["laptop", "hp", "budget", "everyday"]
+    },
+
+    # --- SHOES (MAXIMUM COMFORT FOCUS) ---
+    {
+        "id": "SH-01",
+        "name": "Skechers Go Walk Max - Ultra Cushion",
+        "category": "Shoes",
+        "price": 3499,
+        "comfort_rating": 9.8,
+        "comfort_highlights": "Goga Max high-rebound insole, 5GEN featherweight sole, breathable mesh upper. Zero foot fatigue.",
+        "specs": "Slip-on walking shoe • 230g ultra-light • High-density memory foam",
+        "rating": 4.8,
+        "badge": "Ultimate Comfort",
+        "image_icon": "👟",
+        "tags": ["shoes", "skechers", "walking", "cushion", "soft", "standing", "comfort", "lightweight"]
+    },
+    {
+        "id": "SH-02",
+        "name": "Nike Air Zoom Pegasus 40 Running Shoes",
+        "category": "Shoes",
+        "price": 8995,
+        "comfort_rating": 9.5,
+        "comfort_highlights": "Dual Zoom Air units deliver energized cushioning, engineered heel collar prevents blistering.",
+        "specs": "Running & Gym • Breathable engineered mesh • Responsive arch support",
+        "rating": 4.7,
+        "badge": "Sports Comfort",
+        "image_icon": "👟",
+        "tags": ["shoes", "nike", "running", "sports", "cushioned", "gym", "air"]
+    },
+    {
+        "id": "SH-03",
+        "name": "Puma Softride Rift Tech Walking Shoes",
+        "category": "Shoes",
+        "price": 2799,
+        "comfort_rating": 9.2,
+        "comfort_highlights": "SOFTRIDE foam midsole for extreme plush cushioning, SoftFoam+ sockliner for step-in comfort.",
+        "specs": "Casual & walking • Slip-on lacing • Extra heel padding",
+        "rating": 4.5,
+        "badge": "Best Value Comfort",
+        "image_icon": "👟",
+        "tags": ["shoes", "puma", "softride", "soft", "walking", "daily", "budget"]
+    },
+    {
+        "id": "SH-04",
+        "name": "Woodland Leather All-Terrain Ortho Comfort",
+        "category": "Shoes",
+        "price": 4295,
+        "comfort_rating": 8.7,
+        "comfort_highlights": "Anatomical shock-absorbing footbed, high-traction grooved sole, rugged arch stability.",
+        "specs": "Genuine Nubuck Leather • Outdoor & trekking • Long durability",
+        "rating": 4.4,
+        "badge": "Durable Comfort",
+        "image_icon": "👞",
+        "tags": ["shoes", "woodland", "leather", "trekking", "durability", "boots"]
+    },
+
+    # --- HEADPHONES & AUDIO ---
+    {
+        "id": "HP-01",
+        "name": "Sony WH-1000XM5 Noise Cancelling Headphones",
+        "category": "Headphones",
+        "price": 26990,
+        "comfort_rating": 9.7,
+        "comfort_highlights": "Soft-fit leather memory foam earcups, ultra-lightweight pressure-relieving headband, silent hinge.",
+        "specs": "Industry-leading ANC • 30hr battery • Speak-to-Chat • Hi-Res LDAC",
+        "rating": 4.8,
+        "badge": "Premium Comfort",
+        "image_icon": "🎧",
+        "tags": ["headphones", "sony", "anc", "wireless", "soft", "music", "noise cancelling", "comfort"]
+    },
+    {
+        "id": "HP-02",
+        "name": "boAt Rockerz 550 Over-Ear Wireless",
+        "category": "Headphones",
+        "price": 1799,
+        "comfort_rating": 8.6,
+        "comfort_highlights": "Ergonomic plush ear cushions, adjustable cushioned headband, physical volume wheel.",
+        "specs": "50mm dynamic drivers • 20hr playback • Deep bass • Bluetooth 5.0",
+        "rating": 4.3,
+        "badge": "Budget Favorite",
+        "image_icon": "🎧",
+        "tags": ["headphones", "boat", "bass", "wireless", "budget", "cushion"]
+    },
+    {
+        "id": "HP-03",
+        "name": "Soundcore by Anker Life Q30 Hybrid ANC",
+        "category": "Headphones",
+        "price": 5499,
+        "comfort_rating": 9.3,
+        "comfort_highlights": "Ultra-soft protein leather earcups with memory foam padding, multi-angle rotatable cups.",
+        "specs": "Active Noise Cancelling • 40hr ANC battery • Custom EQ App",
+        "rating": 4.6,
+        "badge": "Best Comfort Value",
+        "image_icon": "🎧",
+        "tags": ["headphones", "anker", "soundcore", "anc", "soft", "travel", "study"]
+    },
+
+    # --- SMARTPHONES ---
+    {
+        "id": "SM-01",
+        "name": "OnePlus Nord CE 4 (8GB RAM / 128GB)",
+        "category": "Smartphones",
+        "price": 24999,
+        "comfort_rating": 9.2,
+        "comfort_highlights": "Smooth curved frame with natural palm grip, 120Hz eye-comfort AMOLED, 100W SuperVOOC charge.",
+        "specs": "Snapdragon 7 Gen 3 • 5500 mAh battery • 50MP Sony OIS Camera",
+        "rating": 4.5,
+        "badge": "All-Rounder",
+        "image_icon": "📱",
+        "tags": ["phone", "smartphone", "oneplus", "battery", "amoled", "fast charging"]
+    },
+    {
+        "id": "SM-02",
+        "name": "Samsung Galaxy M34 5G",
+        "category": "Smartphones",
+        "price": 15999,
+        "comfort_rating": 8.9,
+        "comfort_highlights": "FHD+ sAMOLED 120Hz display with Eye Comfort Shield, massive 6000mAh 2-day battery life.",
+        "specs": "6000 mAh battery • 50MP No Shake Cam • 120Hz Super AMOLED",
+        "rating": 4.4,
+        "badge": "Battery Monster",
+        "image_icon": "📱",
+        "tags": ["phone", "smartphone", "samsung", "battery", "amoled", "budget"]
+    },
+    {
+        "id": "SM-03",
+        "name": "Apple iPhone 15 (128 GB)",
+        "category": "Smartphones",
+        "price": 69900,
+        "comfort_rating": 9.4,
+        "comfort_highlights": "Contoured edge design for easiest one-hand holding, lightweight aerospace aluminum, True Tone display.",
+        "specs": "A16 Bionic chip • Dynamic Island • 48MP main camera • USB-C",
+        "rating": 4.8,
+        "badge": "Flagship Feel",
+        "image_icon": "📱",
+        "tags": ["phone", "smartphone", "apple", "iphone", "camera", "premium"]
+    },
+
+    # --- ERGONOMIC ACCESSORIES & WEARABLES ---
+    {
+        "id": "ER-01",
+        "name": "Logitech Lift Vertical Ergonomic Mouse",
+        "category": "Ergonomics",
+        "price": 5495,
+        "comfort_rating": 9.9,
+        "comfort_highlights": "57° natural handshake posture relieves wrist pressure, silent click buttons, textured thumb rest.",
+        "specs": "Wireless Bluetooth/Bolt • 2-year battery • Small-to-medium hands",
+        "rating": 4.8,
+        "badge": "Ergonomic #1",
+        "image_icon": "🖱️",
+        "tags": ["mouse", "logitech", "ergonomic", "wrist", "comfort", "office", "work"]
+    },
+    {
+        "id": "ER-02",
+        "name": "The Sleep Company SmartGRID Orthopedic Chair",
+        "category": "Ergonomics",
+        "price": 14999,
+        "comfort_rating": 9.8,
+        "comfort_highlights": "Patented SmartGRID seat adapts to tailbone pressure, dynamic 2D lumbar spine support.",
+        "specs": "High back mesh • Multi-lock recline • Height adjustable armrests",
+        "rating": 4.7,
+        "badge": "Back Pain Relief",
+        "image_icon": "🪑",
+        "tags": ["chair", "ergonomic", "posture", "back", "spine", "comfort", "work"]
+    },
+    {
+        "id": "ER-03",
+        "name": "Noise ColorFit Ultra 3 Smartwatch",
+        "category": "Wearables",
+        "price": 2999,
+        "comfort_rating": 9.0,
+        "comfort_highlights": "Skin-friendly breathable silicone strap, 1.96\" AMOLED display, sleep tracking algorithms.",
+        "specs": "Bluetooth calling • 7-day battery • 100+ sports modes",
+        "rating": 4.3,
+        "badge": "Smart Lifestyle",
+        "image_icon": "⌚",
+        "tags": ["watch", "smartwatch", "noise", "health", "strap", "comfort"]
+    }
+]
+
+HTML_TEMPLATE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartShop AI • Online Shopping & Comfort Assistant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+
+  <!-- Top Navigation Bar -->
+  <header class="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <span class="text-3xl">🛍️</span>
+        <div>
+          <h1 class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent">
+            SmartShop AI
+          </h1>
+          <p class="text-[11px] text-slate-400 font-medium">Comfort-Aware Online Recommendation Engine</p>
+        </div>
+      </div>
+
+      <!-- Live Search Bar -->
+      <div class="flex-1 max-w-xl relative">
+        <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        </span>
+        <input 
+          type="text" 
+          id="searchInput"
+          oninput="handleSearch()"
+          placeholder="Search any product (e.g. 'comfortable shoes', 'laptop for coding', 'headphones')..."
+          class="w-full pl-10 pr-4 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+        >
+        <button onclick="clearSearch()" id="clearBtn" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white">✕</button>
+      </div>
+
+      <!-- Quick Stats -->
+      <div class="hidden md:flex items-center space-x-4 text-xs text-slate-300">
+        <div class="bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700/80 flex items-center space-x-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span><strong id="productCount">0</strong> Products in Catalog</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Category Bar -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-2 overflow-x-auto flex space-x-2 border-t border-slate-800/60 no-scrollbar">
+      <button onclick="filterCategory('All')" class="cat-pill px-3 py-1 text-xs font-semibold rounded-lg bg-blue-600 text-white transition">All Items</button>
+      <button onclick="filterCategory('Laptops')" class="cat-pill px-3 py-1 text-xs font-medium rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition">💻 Laptops</button>
+      <button onclick="filterCategory('Shoes')" class="cat-pill px-3 py-1 text-xs font-medium rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition">👟 Shoes & Comfort Footwear</button>
+      <button onclick="filterCategory('Headphones')" class="cat-pill px-3 py-1 text-xs font-medium rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition">🎧 Headphones & Audio</button>
+      <button onclick="filterCategory('Smartphones')" class="cat-pill px-3 py-1 text-xs font-medium rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition">📱 Smartphones</button>
+      <button onclick="filterCategory('Ergonomics')" class="cat-pill px-3 py-1 text-xs font-medium rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition">🪑 Ergonomic Workstation</button>
+      <button onclick="filterCategory('Wearables')" class="cat-pill px-3 py-1 text-xs font-medium rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition">⌚ Wearables</button>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+    <!-- Left Controls Panel -->
+    <aside class="lg:col-span-1 space-y-5">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 sticky top-28 space-y-5">
+        
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div class="flex items-center space-x-2">
+            <span class="text-xl">✨</span>
+            <h3 class="font-bold text-sm text-white">Your Comfort Filter</h3>
+          </div>
+          <button onclick="resetFilters()" class="text-xs text-blue-400 hover:underline">Reset</button>
+        </div>
+
+        <!-- Comfort Priority Slider -->
+        <div>
+          <div class="flex justify-between items-center text-xs font-semibold mb-1">
+            <span class="text-slate-300">Minimum Comfort Score</span>
+            <span id="comfortLabel" class="text-blue-400 font-bold">7.5 / 10</span>
+          </div>
+          <input 
+            type="range" 
+            id="comfortRange" 
+            min="5.0" 
+            max="10.0" 
+            step="0.1" 
+            value="7.5" 
+            oninput="handleFilterChange()" 
+            class="w-full accent-blue-500 cursor-pointer"
+          >
+          <div class="flex justify-between text-[10px] text-slate-500 mt-1">
+            <span>Basic (5.0)</span>
+            <span>Balanced (7.5)</span>
+            <span>Orthopedic/Plush (9.5+)</span>
+          </div>
+        </div>
+
+        <!-- Budget Slider -->
+        <div>
+          <div class="flex justify-between items-center text-xs font-semibold mb-1">
+            <span class="text-slate-300">Max Budget</span>
+            <span id="budgetLabel" class="text-emerald-400 font-bold">₹75,000</span>
+          </div>
+          <input 
+            type="range" 
+            id="budgetRange" 
+            min="2000" 
+            max="100000" 
+            step="1000" 
+            value="75000" 
+            oninput="handleFilterChange()" 
+            class="w-full accent-emerald-500 cursor-pointer"
+          >
+          <div class="flex justify-between text-[10px] text-slate-500 mt-1">
+            <span>₹2,000</span>
+            <span>₹50,000</span>
+            <span>₹1,00,000</span>
+          </div>
+        </div>
+
+        <!-- Sort by Preference -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Ranking Objective</label>
+          <select id="sortBy" onchange="handleFilterChange()" class="w-full bg-slate-800 border border-slate-700 text-xs text-slate-200 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <option value="comfort_desc">🌟 Highest Comfort & Ergonomics First</option>
+            <option value="match_desc">🎯 Smart Relevance + Comfort</option>
+            <option value="price_asc">💵 Price: Low to High</option>
+            <option value="price_desc">💎 Price: High to Low</option>
+            <option value="rating_desc">⭐ Customer Reviews Rating</option>
+          </select>
+        </div>
+
+        <!-- Quick Comfort Tags -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">One-Click Comfort Tags</label>
+          <div class="flex flex-wrap gap-1.5">
+            <button onclick="quickTag('cushion')" class="text-[11px] px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">☁️ Soft Cushion</button>
+            <button onclick="quickTag('lightweight')" class="text-[11px] px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">🪶 Ultra Light</button>
+            <button onclick="quickTag('ergonomic')" class="text-[11px] px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">🧘 Wrist/Spine</button>
+            <button onclick="quickTag('battery')" class="text-[11px] px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">🔋 All-Day Battery</button>
+            <button onclick="quickTag('blue light')" class="text-[11px] px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">👁️ Eye Comfort</button>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- Right Products Grid -->
+    <section class="lg:col-span-3 space-y-4">
+      
+      <!-- Results Bar -->
+      <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-900/60 p-3 rounded-xl border border-slate-800 text-xs">
+        <div class="text-slate-300">
+          Showing <span id="showingCount" class="font-bold text-white">0</span> matching items based on your comfort criteria
+        </div>
+        <div id="activeFilterBadge" class="text-blue-400 font-medium">Category: All</div>
+      </div>
+
+      <!-- Products Grid -->
+      <div id="productsGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <!-- Dynamically Rendered -->
+      </div>
+
+      <!-- Empty State Container -->
+      <div id="emptyState" class="hidden text-center py-16 px-4 bg-slate-900/40 rounded-2xl border border-slate-800 space-y-3">
+        <span class="text-5xl">🔍</span>
+        <h3 class="text-base font-bold text-slate-200">No matching products found</h3>
+        <p class="text-xs text-slate-400 max-w-md mx-auto">
+          Try expanding your budget slider or lowering the comfort minimum score.
+        </p>
+        <button onclick="resetFilters()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold transition">
+          Reset All Filters
+        </button>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Product Modal -->
+  <div id="productModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 relative shadow-2xl">
+      <button onclick="closeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg">✕</button>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <script>
+    const CATALOG = """ + json.dumps(PRODUCTS) + """;
+
+    let activeCategory = "All";
+    let searchQuery = "";
+    let minComfort = 7.5;
+    let maxBudget = 75000;
+    let sortMode = "comfort_desc";
+
+    document.getElementById("productCount").innerText = CATALOG.length;
+
+    function renderProducts() {
+      const grid = document.getElementById("productsGrid");
+      const emptyState = document.getElementById("emptyState");
+      const showingCount = document.getElementById("showingCount");
+
+      let filtered = CATALOG.filter(p => {
+        if (activeCategory !== "All" && p.category !== activeCategory) return false;
+        if (p.price > maxBudget) return false;
+        if (p.comfort_rating < minComfort) return false;
+        if (searchQuery.trim() !== "") {
+          const q = searchQuery.toLowerCase();
+          const matchName = p.name.toLowerCase().includes(q);
+          const matchCategory = p.category.toLowerCase().includes(q);
+          const matchSpecs = p.specs.toLowerCase().includes(q);
+          const matchComfort = p.comfort_highlights.toLowerCase().includes(q);
+          const matchTags = p.tags && p.tags.some(t => t.toLowerCase().includes(q));
+          if (!matchName && !matchCategory && !matchSpecs && !matchComfort && !matchTags) return false;
+        }
+        return true;
+      });
+
+      filtered.sort((a, b) => {
+        if (sortMode === "comfort_desc") return b.comfort_rating - a.comfort_rating;
+        if (sortMode === "price_asc") return a.price - b.price;
+        if (sortMode === "price_desc") return b.price - a.price;
+        if (sortMode === "rating_desc") return b.rating - a.rating;
+        return (b.comfort_rating * 0.7 + b.rating * 0.3) - (a.comfort_rating * 0.7 + a.rating * 0.3);
+      });
+
+      showingCount.innerText = filtered.length;
+
+      if (filtered.length === 0) {
+        grid.innerHTML = "";
+        emptyState.classList.remove("hidden");
+        return;
+      }
+
+      emptyState.classList.add("hidden");
+      grid.innerHTML = filtered.map(p => {
+        const comfortPercentage = Math.round((p.comfort_rating / 10) * 100);
+        return `
+          <div class="bg-slate-900 border border-slate-800 hover:border-blue-500/50 rounded-2xl p-4 flex flex-col justify-between transition group hover:shadow-lg hover:shadow-blue-500/5">
+            <div>
+              <div class="flex items-start justify-between gap-2">
+                <span class="text-3xl p-2 bg-slate-800 rounded-xl group-hover:scale-110 transition duration-200">${p.image_icon}</span>
+                <div class="text-right">
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">${p.badge}</span>
+                  <div class="text-base font-extrabold text-white mt-1">₹${p.price.toLocaleString('en-IN')}</div>
+                </div>
+              </div>
+
+              <h4 class="text-sm font-bold text-white mt-3 group-hover:text-blue-300 transition">${p.name}</h4>
+              <p class="text-xs text-slate-400 mt-1 line-clamp-2">${p.specs}</p>
+
+              <div class="mt-3 p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/60 text-xs">
+                <div class="flex items-center justify-between text-[11px] mb-1">
+                  <span class="text-blue-400 font-semibold flex items-center gap-1">
+                    <span>☁️ Comfort Score</span>
+                  </span>
+                  <span class="font-extrabold text-white">${p.comfort_rating} / 10</span>
+                </div>
+                <div class="w-full bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                  <div class="bg-gradient-to-r from-blue-500 to-indigo-400 h-full rounded-full" style="width: ${comfortPercentage}%"></div>
+                </div>
+                <p class="text-[11px] text-slate-300 mt-2 line-clamp-2">
+                  <strong class="text-slate-200">Ergonomics:</strong> ${p.comfort_highlights}
+                </p>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
+              <div class="text-xs text-amber-400 flex items-center space-x-1">
+                <span>⭐</span>
+                <span class="font-bold text-white">${p.rating}</span>
+              </div>
+              <button onclick="openModal('${p.id}')" class="text-xs font-semibold px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition shadow-sm">
+                View & Compare
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function handleSearch() {
+      searchQuery = document.getElementById("searchInput").value;
+      const clearBtn = document.getElementById("clearBtn");
+      if (searchQuery.trim().length > 0) {
+        clearBtn.classList.remove("hidden");
+      } else {
+        clearBtn.classList.add("hidden");
+      }
+      renderProducts();
+    }
+
+    function clearSearch() {
+      document.getElementById("searchInput").value = "";
+      searchQuery = "";
+      document.getElementById("clearBtn").classList.add("hidden");
+      renderProducts();
+    }
+
+    function filterCategory(cat) {
+      activeCategory = cat;
+      document.getElementById("activeFilterBadge").innerText = `Category: ${cat}`;
+      document.querySelectorAll(".cat-pill").forEach(el => {
+        if (el.innerText.includes(cat) || (cat === "All" && el.innerText.includes("All"))) {
+          el.className = "cat-pill px-3 py-1 text-xs font-semibold rounded-lg bg-blue-600 text-white transition";
+        } else {
+          el.className = "cat-pill px-3 py-1 text-xs font-medium rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition";
+        }
+      });
+      renderProducts();
+    }
+
+    function handleFilterChange() {
+      minComfort = parseFloat(document.getElementById("comfortRange").value);
+      maxBudget = parseInt(document.getElementById("budgetRange").value);
+      sortMode = document.getElementById("sortBy").value;
+
+      document.getElementById("comfortLabel").innerText = minComfort.toFixed(1) + " / 10";
+      document.getElementById("budgetLabel").innerText = "₹" + maxBudget.toLocaleString("en-IN");
+      renderProducts();
+    }
+
+    function quickTag(tag) {
+      document.getElementById("searchInput").value = tag;
+      handleSearch();
+    }
+
+    function resetFilters() {
+      activeCategory = "All";
+      searchQuery = "";
+      minComfort = 5.0;
+      maxBudget = 100000;
+      sortMode = "comfort_desc";
+
+      document.getElementById("searchInput").value = "";
+      document.getElementById("comfortRange").value = 5.0;
+      document.getElementById("budgetRange").value = 100000;
+      document.getElementById("sortBy").value = "comfort_desc";
+      document.getElementById("comfortLabel").innerText = "5.0 / 10";
+      document.getElementById("budgetLabel").innerText = "₹1,00,000";
+
+      filterCategory("All");
+      renderProducts();
+    }
+
+    function openModal(id) {
+      const p = CATALOG.find(item => item.id === id);
+      if (!p) return;
+      const modal = document.getElementById("productModal");
+      const content = document.getElementById("modalContent");
+      content.innerHTML = `
+        <div class="flex items-start gap-4">
+          <span class="text-4xl p-3 bg-slate-800 rounded-2xl">${p.image_icon}</span>
+          <div>
+            <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">${p.category}</span>
+            <h3 class="text-base font-extrabold text-white">${p.name}</h3>
+            <div class="text-lg font-black text-emerald-400 mt-1">₹${p.price.toLocaleString('en-IN')}</div>
+          </div>
+        </div>
+
+        <div class="p-3 bg-slate-800/80 rounded-xl space-y-2 text-xs">
+          <div><strong class="text-slate-300">Technical Specs:</strong> <span class="text-slate-200">${p.specs}</span></div>
+          <div><strong class="text-blue-400">Comfort Highlights:</strong> <span class="text-slate-200">${p.comfort_highlights}</span></div>
+          <div><strong class="text-amber-400">Verified Rating:</strong> ⭐ ${p.rating} / 5.0</div>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button onclick="closeModal()" class="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl transition">
+            Close
+          </button>
+          <button onclick="alert('Proceeding with ' + p.name + ' based on your comfort criteria!')" class="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl transition">
+            Choose This Item
+          </button>
+        </div>
+      `;
+      modal.classList.remove("hidden");
+    }
+
+    function closeModal() {
+      document.getElementById("productModal").classList.add("hidden");
+    }
+
+    // Initial render
+    renderProducts();
+  </script>
+
+</body>
+</html>
+"""
+
+
+class ShoppingAppServer(SimpleHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/" or self.path.startswith("/?"):
+            self.send_response(200)
+            self.send_header("Content-type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(HTML_TEMPLATE.encode("utf-8"))
+        elif self.path == "/api/products":
+            self.send_response(200)
+            self.send_header("Content-type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps(PRODUCTS).encode("utf-8"))
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+
+def launch_server(port=PORT):
+    server = HTTPServer(("127.0.0.1", port), ShoppingAppServer)
+    url = f"http://127.0.0.1:{port}"
+    print("=" * 75)
+    print(f"🚀 SMART SHOP AI: Online Shopping & Comfort Recommendation App")
+    print(f"🌐 Running locally at: {url}")
+    print(f"💡 Opening your browser straight to the app now...")
+    print("=" * 75)
+
+    threading.Thread(target=lambda: (time.sleep(0.8), webbrowser.open(url))).start()
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nStopping shopping server.")
+        server.server_close()
+
+
+if __name__ == "__main__":
+    launch_server()
